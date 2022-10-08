@@ -1,0 +1,316 @@
+#include "arduinoFFT.h"
+#include <SoftwareSerial.h> 
+#define m11 26
+#define m12 28
+#define m21 22
+#define m22 24
+#define m1s 8 //PWM signal for movement motor
+#define m2s 9 // PWM signal for movement motor
+int movementmotorspeed=254;
+
+#define m31 30  //arm motor
+#define m32 32
+#define m41 34
+#define m42 36
+#define m3s 10//PWM signal for arm motor
+#define m4s 11// PWM signal for arm motor
+#define m51 38
+#define m52 40
+#define m61 42
+#define m62 44
+//#define m5s 12//PWM signal for arm motor
+//#define m6s 13// PWM signal for arm motor
+int armmotorspeed=150;
+#define SAMPLES 128             //SAMPLES-pt FFT. Must be a base 2 number. Max 128 for Arduino Uno.
+#define SAMPLING_FREQUENCY 2048 //Ts = Based on Nyquist, must be 2 times the highest expected frequency.
+SoftwareSerial BT(51, 53); //RX TX //51 53
+unsigned int samplingPeriod;
+unsigned long microSeconds;
+double vReal[SAMPLES]; //create vector of size SAMPLES to hold real values
+double vImag[SAMPLES]; //create vector of size SAMPLES to hold imaginary values
+arduinoFFT FFT = arduinoFFT();
+char command;  
+int TCRT[2]={A1,A2};
+int sensor1 = A1;
+int sensor2 = A2;
+int sensor3 = A3;
+int sensor4 = A4;
+int sensorvalue1;
+int sensorvalue2;
+int sensorvalue3;
+int sensorvalue4;
+int state=0;
+
+
+
+void setup() 
+{
+  
+  Serial.begin(9600);  
+  samplingPeriod = round(1000000*(1.0/SAMPLING_FREQUENCY)); //Period in microseconds 
+  Serial.println("BT is ready!");
+  BT.begin(9600);
+  pinMode(m11,OUTPUT);
+  pinMode(m12,OUTPUT);
+  pinMode(m1s,OUTPUT);
+  pinMode(m21,OUTPUT);
+  pinMode(m22,OUTPUT);
+  pinMode(m2s,OUTPUT);
+  pinMode(m31,OUTPUT);
+  pinMode(m32,OUTPUT);
+  pinMode(m3s,OUTPUT);
+  pinMode(m41,OUTPUT);
+  pinMode(m42,OUTPUT);
+  pinMode(m4s,OUTPUT);
+  pinMode(m51,OUTPUT);
+  pinMode(m52,OUTPUT);
+  //pinMode(m5s,OUTPUT);
+  pinMode(m61,OUTPUT);
+  pinMode(m62,OUTPUT);
+ // pinMode(m6s,OUTPUT);
+  pinMode(sensor1,INPUT);
+  pinMode(sensor2,INPUT);
+  pinMode(sensor3,INPUT);
+  pinMode(sensor4,INPUT);
+
+
+  for(int i=0;i<2;i++){pinMode(TCRT[i],INPUT);}
+    
+}
+
+
+
+
+
+void loop() 
+{
+  if(BT.available()) 
+  {
+    command=BT.read();
+    Serial.print(command);
+    switch(command) 
+    {
+      case 'f':
+     analogWrite(m1s, movementmotorspeed); 
+     analogWrite(m2s, movementmotorspeed);
+    
+     digitalWrite(m11,HIGH);//一顆的
+     digitalWrite(m12,LOW);
+     digitalWrite(m21,HIGH);//兩顆的
+     digitalWrite(m22,LOW);
+     Serial.println("forward");
+       break;
+      case 'b':
+     digitalWrite(m11,LOW);
+     digitalWrite(m12,HIGH);
+     digitalWrite(m21,LOW);
+     digitalWrite(m22,HIGH);
+     
+       break;
+       case 'l':
+     digitalWrite(m11,LOW);
+     digitalWrite(m12,HIGH);
+     digitalWrite(m21,HIGH);
+     digitalWrite(m22,LOW);
+       break;
+       case 'r':
+     digitalWrite(m11,HIGH);
+     digitalWrite(m12,LOW);
+     digitalWrite(m21,LOW);
+     digitalWrite(m22,HIGH);
+       break;
+       case 's':
+     digitalWrite(m11,LOW);
+     digitalWrite(m12,LOW);
+     digitalWrite(m21,LOW);
+     digitalWrite(m22,LOW);
+     digitalWrite(m31,LOW);
+     digitalWrite(m32,LOW);
+      digitalWrite(m41,LOW);
+     digitalWrite(m42,LOW);
+     digitalWrite(m51,LOW);
+     digitalWrite(m52,LOW);
+     digitalWrite(m61,LOW);
+     digitalWrite(m62,LOW);
+    Serial.print("stop");
+       break;
+       
+       case 'x':
+      analogWrite(m3s, armmotorspeed); 
+      analogWrite(m4s, armmotorspeed);
+      digitalWrite(m31,HIGH);
+      digitalWrite(m32,LOW);
+      digitalWrite(m41,HIGH);
+      digitalWrite(m42,LOW);
+       break;
+       case 'u':
+       analogWrite(m3s, armmotorspeed); 
+       analogWrite(m4s, armmotorspeed);
+       digitalWrite(m31,LOW);
+       digitalWrite(m32,HIGH);
+       digitalWrite(m41,LOW);
+       digitalWrite(m42,HIGH);
+       break;
+       case 'y': //the slower motor
+      //analogWrite(m5s, 254); 
+      //analogWrite(m6s, 254);
+      digitalWrite(m51,HIGH);
+      digitalWrite(m52,LOW);
+      digitalWrite(m61,HIGH);
+      digitalWrite(m62,LOW);
+       break;
+        case 'v':
+       //analogWrite(m5s, 254); 
+       //analogWrite(m6s, 254);
+       digitalWrite(m51,LOW);
+       digitalWrite(m52,HIGH);
+       digitalWrite(m61,LOW);
+       digitalWrite(m62,HIGH);
+       break;
+
+       case 'a':
+     Serial.println("auto mode on");
+     while(BT.available()==0)
+     {
+
+     //  int sensorValue=analogRead(A0);
+    /*Sample SAMPLES times*/
+    for(int i=0; i<SAMPLES; i++)
+    {
+        microSeconds = micros();    //Returns the number of microseconds since the Arduino board began running the current script. 
+     
+        vReal[i] = analogRead(0); //Reads the value from analog pin 0 (A0), quantize it and save it as a real term.
+        vImag[i] = 0; //Makes imaginary term 0 always
+
+        /*remaining wait time between samples if necessary*/
+        while(micros() < (microSeconds + samplingPeriod))
+        {
+          //do nothing
+        }
+    }
+     /*Perform FFT on samples*/
+    FFT.Windowing(vReal, SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
+    FFT.Compute(vReal, vImag, SAMPLES, FFT_FORWARD);
+    FFT.ComplexToMagnitude(vReal, vImag, SAMPLES);
+    /*Find peak frequency and print peak*/
+    double peak = FFT.MajorPeak(vReal, SAMPLES, SAMPLING_FREQUENCY);
+    Serial.println(peak);     //Print out the most dominant frequency.
+ 
+  
+    if (peak>=620) //659
+    {
+      Serial.println("cease movement");
+      digitalWrite(m11,LOW);
+      digitalWrite(m12,LOW);
+      digitalWrite(m21,LOW);
+      digitalWrite(m22,LOW);
+      digitalWrite(m31,LOW);
+      digitalWrite(m32,LOW);
+      digitalWrite(m41,LOW);
+      digitalWrite(m42,LOW);
+    } else 
+    {
+      Serial.println("moving");
+      sensorvalue1 = analogRead(sensor1);
+      sensorvalue2 = analogRead(sensor2);
+      sensorvalue3 = analogRead(sensor3);
+      sensorvalue4 = analogRead(sensor4);
+      //Serial.print("Analog reading=\n");
+      Serial.println(sensorvalue1);
+      Serial.println(sensorvalue2);
+      Serial.println(sensorvalue3);
+      Serial.println(sensorvalue4);
+      Serial.println("\n");
+   if(sensorvalue2<300 && sensorvalue3<300 && sensorvalue1<300 && sensorvalue4<300)//forward
+   {
+    
+    
+    analogWrite(m1s, 200); //slowing the speed down
+    analogWrite(m2s, 200);
+    digitalWrite(m11,HIGH);//一顆的
+     digitalWrite(m12,LOW);
+     digitalWrite(m21,HIGH);//兩顆的
+     digitalWrite(m22,LOW);
+     Serial.print("forwarding\n");
+   }
+   
+   if(sensorvalue2<300 && sensorvalue3>600 && sensorvalue1<300 && sensorvalue4<300)
+   {
+     analogWrite(m1s, 200); //slowing the speed down
+    analogWrite(m2s, 200);
+    digitalWrite(m11,HIGH);
+     digitalWrite(m12,LOW);
+     digitalWrite(m21,LOW);
+     digitalWrite(m22,HIGH);
+     Serial.print("adjust right\n");
+   }
+   
+   if(sensorvalue2>600 && sensorvalue3<300 && sensorvalue1<300 && sensorvalue4<300)
+   {
+     analogWrite(m1s, 200); //slowing the speed down
+    analogWrite(m2s, 200);
+    digitalWrite(m11,LOW);
+     digitalWrite(m12,HIGH);
+     digitalWrite(m21,HIGH);
+     digitalWrite(m22,LOW);
+     Serial.print("adjust left\n");
+   }
+   
+   if(sensorvalue2<300 && sensorvalue3<300 && sensorvalue1>600 && sensorvalue4<300)
+   {
+     analogWrite(m1s, 255); //slowing the speed down
+    analogWrite(m2s, 255);
+    digitalWrite(m11,LOW);
+     digitalWrite(m12,HIGH);
+     digitalWrite(m21,HIGH);
+     digitalWrite(m22,LOW);
+     Serial.print("severe adjust left\n");
+   }
+   
+   if(sensorvalue2<300 && sensorvalue3<300 && sensorvalue1<300 && sensorvalue4>600)
+   {
+     analogWrite(m1s, 255); //slowing the speed down
+    analogWrite(m2s, 255);
+    digitalWrite(m11,HIGH);
+     digitalWrite(m12,LOW);
+     digitalWrite(m21,LOW);
+     digitalWrite(m22,HIGH);
+     Serial.print("severe adjust right\n");
+   }
+
+   if(sensorvalue2>600 && sensorvalue3>600 && sensorvalue1>600 && sensorvalue4>600)
+   {
+    digitalWrite(m11,LOW);
+     digitalWrite(m12,LOW);
+     digitalWrite(m21,LOW);
+     digitalWrite(m22,LOW);
+     Serial.print("stop\n");
+   }
+} //else bracket
+   }
+        break;
+
+       
+     default:
+     digitalWrite(m11,LOW);
+     digitalWrite(m12,LOW);
+     digitalWrite(m21,LOW);
+     digitalWrite(m22,LOW);
+     digitalWrite(m31,LOW);
+     digitalWrite(m32,LOW);
+      digitalWrite(m41,LOW);
+     digitalWrite(m42,LOW);
+       break;
+}
+    
+  }
+
+
+
+
+
+  
+}
+ 
+
+  
