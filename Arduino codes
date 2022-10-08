@@ -94,9 +94,9 @@ void loop()
      analogWrite(m1s, movementmotorspeed); 
      analogWrite(m2s, movementmotorspeed);
     
-     digitalWrite(m11,HIGH);//一顆的
+     digitalWrite(m11,HIGH);
      digitalWrite(m12,LOW);
-     digitalWrite(m21,HIGH);//兩顆的
+     digitalWrite(m21,HIGH);
      digitalWrite(m22,LOW);
      Serial.println("forward");
        break;
@@ -227,9 +227,9 @@ void loop()
     
     analogWrite(m1s, 200); //slowing the speed down
     analogWrite(m2s, 200);
-    digitalWrite(m11,HIGH);//一顆的
+    digitalWrite(m11,HIGH);
      digitalWrite(m12,LOW);
-     digitalWrite(m21,HIGH);//兩顆的
+     digitalWrite(m21,HIGH);
      digitalWrite(m22,LOW);
      Serial.print("forwarding\n");
    }
