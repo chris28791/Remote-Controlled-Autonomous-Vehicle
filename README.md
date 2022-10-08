@@ -1,4 +1,4 @@
-# portfolio This file is the Arduino code that controls the vehicle
+# portfolio
 
 Line 1~74 are the intial setups, setting pins, defining variables etc
 
